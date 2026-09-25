@@ -1,0 +1,24 @@
+# Docker-Compose-Vorlage – Tag 3
+# Läuft heute lokal auf eurem eigenen Laptop.
+#
+# Hinweis: redis wird hier nur eingebunden, um ein echtes Multi-Container-Setup
+# zu üben - der Trainingscode nutzt es noch nicht aktiv. Das kommt an späteren
+# Kurstagen (z. B. Tag 7 mit MLflow + Postgres + MinIO).
+
+services:
+  app:
+    build: .
+    image: mlops-training
+    container_name: mlops-training
+    volumes:
+      # TODO: bindet das aktuelle Verzeichnis so ein, dass model.pkl nach dem
+      # Training auch außerhalb des Containers auf eurem Laptop sichtbar ist
+         - ./:/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: mlops-redis
+    # Kein Port nach außen offen - redis muss nur innerhalb des
+    # Compose-Netzwerks erreichbar sein.
