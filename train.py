@@ -1,20 +1,21 @@
 """
-Trainingsskript für das durchgängige Kursprojekt.
+Erweiterung von train_mit_mlflow.py (Tag 6/7) um Model-Registry-Registrierung.
 
-Trainiert einen einfachen Klassifikator auf dem Iris-Datensatz (in scikit-learn
-eingebaut, kein Download nötig) und speichert das Modell als model.pkl.
-
-Dieses Skript wird ab Tag 3 in vielen weiteren Kurstagen wiederverwendet:
-- Tag 4: in eine FastAPI-Inference-API eingebettet
-- Tag 6: um MLflow-Tracking erweitert
-- Tag 9: Daten/Modell werden mit DVC versioniert
-- Tag 12/13: als Schritt in eine orchestrierte Pipeline eingebunden
+Ersetzt joblib.dump + log_artifact durch mlflow.sklearn.log_model, das
+Serialisierung UND Registrierung in einem Schritt erledigt.
 """
-import joblib
+
+import mlflow
+import mlflow.sklearn
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment("iris-klassifikator")
+
+N_ESTIMATORS = 200
 
 
 def main():
@@ -24,15 +25,26 @@ def main():
         X, y, test_size=0.2, random_state=42
     )
 
-    print("Trainiere Modell...")
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
+    with mlflow.start_run():
+        mlflow.log_param("n_estimators", N_ESTIMATORS)
 
-    accuracy = accuracy_score(y_test, model.predict(X_test))
-    print(f"Accuracy auf Testdaten: {accuracy:.3f}")
+        print("Trainiere Modell...")
+        model = RandomForestClassifier(n_estimators=N_ESTIMATORS, random_state=42)
+        model.fit(X_train, y_train)
 
-    joblib.dump(model, "model.pkl")
-    print("Modell gespeichert unter model.pkl")
+        accuracy = accuracy_score(y_test, model.predict(X_test))
+        print(f"Accuracy auf Testdaten: {accuracy:.3f}")
+        mlflow.log_metric("accuracy", accuracy)
+
+        # TODO 1: Loggt UND registriert das Modell in einem Schritt.
+        # Signatur: mlflow.sklearn.log_model(<model>, <artifact_path as string>,
+        #           registered_model_name=<name als string>)
+        # Nutzt "model" als artifact_path und "iris-classifier" als Name.
+        mlflow.sklearn.log_model(
+            model, "model", registered_model_name="iris-classifier"
+        )
+
+        print("Modell trainiert, getrackt und registriert.")
 
 
 if __name__ == "__main__":

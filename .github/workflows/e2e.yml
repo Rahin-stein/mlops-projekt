@@ -1,0 +1,69 @@
+name: End-to-End ML Pipeline
+
+on:
+  push:
+    branches: [main]
+
+# Für den Push ins GHCR (wie bei Tag 10/11)
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  train-and-deploy:
+    # TODO 1: Läuft auf eurem eigenen registrierten Runner statt
+    # GitHub-gehostet (ein Wort, siehe Vortragsskript Abschnitt 5)
+    runs-on: self-hosted
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_S3_ENDPOINT_URL: ${{ secrets.MLFLOW_S3_ENDPOINT_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v7
+
+      # Der Runner ist euer eigener Laptop: Das System-Python ist dort
+      # "externally managed" (uv pip install --system bricht ab). Deshalb eine
+      # eigene venv - bewusst AUSSERHALB des Arbeitsordners, damit sie nicht im
+      # Docker-Build-Kontext landet. $GITHUB_PATH macht sie für alle folgenden
+      # Schritte zum Standard-"python".
+      - name: Abhängigkeiten installieren
+        run: |
+          uv venv "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv/bin/python" -r requirements.txt
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      # data/iris.csv steht in der .gitignore (Tag 9) - im frischen Checkout
+      # fehlt die Datei, nur data/iris.csv.dvc ist in Git. DVC holt sie aus MinIO.
+      - name: Daten per DVC holen
+        run: dvc pull
+
+      # TODO 2: Führt den Prefect-Flow aus Tag 12 aus
+      - name: Pipeline ausführen (Validieren -> Trainieren -> Tracken)
+        run: python pipeline.py
+
+      # TODO 3: Führt das Quality-Gate-Skript aus
+      - name: Quality Gate prüfen
+        run: python quality_gate.py
+
+      - name: Modell als @champion promoten
+        run: python promote_champion.py
+
+      # Auf dem Self-hosted Runner nicht vorinstalliert wie bei ubuntu-latest
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v4
+
+      - name: In GHCR einloggen
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Inference-Image neu bauen und pushen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
