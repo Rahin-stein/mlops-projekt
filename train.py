@@ -5,6 +5,7 @@ Ersetzt joblib.dump + log_artifact durch mlflow.sklearn.log_model, das
 Serialisierung UND Registrierung in einem Schritt erledigt.
 """
 
+import joblib
 import mlflow
 import mlflow.sklearn
 from sklearn.datasets import load_iris
@@ -31,7 +32,7 @@ def main():
         print("Trainiere Modell...")
         model = RandomForestClassifier(n_estimators=N_ESTIMATORS, random_state=42)
         model.fit(X_train, y_train)
-
+        joblib.dump(model, "model.pkl")
         accuracy = accuracy_score(y_test, model.predict(X_test))
         print(f"Accuracy auf Testdaten: {accuracy:.3f}")
         mlflow.log_metric("accuracy", accuracy)
