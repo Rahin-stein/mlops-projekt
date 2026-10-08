@@ -30,7 +30,7 @@ jobs:
       # Schritte zum Standard-"python".
       - name: Abhängigkeiten installieren
         run: |
-          uv venv "$RUNNER_TEMP/venv"
+          uv venv --python 3.12 "$RUNNER_TEMP/venv"
           uv pip install --python "$RUNNER_TEMP/venv/bin/python" -r requirements.txt
           echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
 
