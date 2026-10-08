@@ -8,7 +8,7 @@ import sys
 import mlflow
 
 mlflow.set_tracking_uri("http://localhost:5000")
-THRESHOLD = 0.9
+THRESHOLD = 1.01
 
 
 def main():
